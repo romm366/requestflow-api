@@ -1,3 +1,4 @@
+using RequestFlow.Api.Models;
 var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
@@ -13,6 +14,18 @@ if (app.Environment.IsDevelopment())
 }
 
 app.UseHttpsRedirection();
+
+var tickets = new List<SupportTicket>();
+
+tickets.Add(new SupportTicket
+{
+    Id = 1,
+    Title = "Monitor not working",
+    Description = "The second monitor has no image.",
+    Priority = "Medium",
+    Status = "Open",
+    CreatedAtUtc = DateTime.UtcNow
+});
 
 var summaries = new[]
 {
@@ -33,9 +46,45 @@ app.MapGet("/weatherforecast", () =>
 })
 .WithName("GetWeatherForecast");
 
-app.MapGet("/api/health", () =>
-{
+app.MapGet("/api/health", () => {
     return new { status = "OK" };
+});
+
+app.MapGet("/api/tickets", () => {
+    return tickets;
+});
+
+app.MapGet("/api/tickets/{id}", (int id) =>
+{
+    var ticket = tickets.FirstOrDefault(t => t.Id == id);
+
+    if (ticket == null)
+    {
+        return Results.NotFound();
+    }
+
+    return Results.Ok(ticket);
+});
+
+app.MapPost("/api/tickets", (CreateTicketRequest request) =>
+{
+    if (string.IsNullOrWhiteSpace(request.Title))
+    {
+        return Results.BadRequest("Title is required.");
+    }
+    var ticket = new SupportTicket
+    {
+        Id = tickets.Count + 1,
+        Title = request.Title,
+        Description = request.Description,
+        Priority = request.Priority,
+        Status = "Open",
+        CreatedAtUtc = DateTime.UtcNow
+    };
+
+    tickets.Add(ticket);
+
+    return Results.Created($"/api/tickets/{ticket.Id}", ticket);
 });
 
 app.Run();
