@@ -1,14 +1,9 @@
 @RequestFlow.Api_HostAddress = http://localhost:5285
-
-GET {{RequestFlow.Api_HostAddress}}/weatherforecast/
-Accept: application/json
-
-###
 POST https://localhost:7157/api/tickets
 Content-Type: application/json
 
 {
-  "title": "",
-  "description": "Testing invalid input",
+  "title": "VPN access required",
+  "description": "I need VPN access for remote work.",
   "priority": "Medium"
 }

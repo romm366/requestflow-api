@@ -1,5 +1,11 @@
+
+using Microsoft.EntityFrameworkCore;
+using RequestFlow.Api.Data;
 using RequestFlow.Api.Models;
 var builder = WebApplication.CreateBuilder(args);
+builder.Services.AddDbContext<AppDbContext>(options =>
+    options.UseSqlite(
+        builder.Configuration.GetConnectionString("DefaultConnection")));
 
 // Add services to the container.
 // Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
@@ -15,48 +21,20 @@ if (app.Environment.IsDevelopment())
 
 app.UseHttpsRedirection();
 
-var tickets = new List<SupportTicket>();
-
-tickets.Add(new SupportTicket
-{
-    Id = 1,
-    Title = "Monitor not working",
-    Description = "The second monitor has no image.",
-    Priority = "Medium",
-    Status = "Open",
-    CreatedAtUtc = DateTime.UtcNow
-});
-
-var summaries = new[]
-{
-    "Freezing", "Bracing", "Chilly", "Cool", "Mild", "Warm", "Balmy", "Hot", "Sweltering", "Scorching"
-};
-
-app.MapGet("/weatherforecast", () =>
-{
-    var forecast =  Enumerable.Range(1, 5).Select(index =>
-        new WeatherForecast
-        (
-            DateOnly.FromDateTime(DateTime.Now.AddDays(index)),
-            Random.Shared.Next(-20, 55),
-            summaries[Random.Shared.Next(summaries.Length)]
-        ))
-        .ToArray();
-    return forecast;
-})
-.WithName("GetWeatherForecast");
-
 app.MapGet("/api/health", () => {
     return new { status = "OK" };
 });
 
-app.MapGet("/api/tickets", () => {
-    return tickets;
+app.MapGet("/api/tickets", async (AppDbContext db) =>
+{
+    var tickets = await db.Tickets.ToListAsync();
+
+    return Results.Ok(tickets);
 });
 
-app.MapGet("/api/tickets/{id}", (int id) =>
+app.MapGet("/api/tickets/{id}", async (int id, AppDbContext db) =>
 {
-    var ticket = tickets.FirstOrDefault(t => t.Id == id);
+    var ticket = await db.Tickets.FindAsync(id);
 
     if (ticket == null)
     {
@@ -66,7 +44,7 @@ app.MapGet("/api/tickets/{id}", (int id) =>
     return Results.Ok(ticket);
 });
 
-app.MapPost("/api/tickets", (CreateTicketRequest request) =>
+app.MapPost("/api/tickets", async (CreateTicketRequest request, AppDbContext db) =>
 {
     if (string.IsNullOrWhiteSpace(request.Title))
     {
@@ -74,7 +52,6 @@ app.MapPost("/api/tickets", (CreateTicketRequest request) =>
     }
     var ticket = new SupportTicket
     {
-        Id = tickets.Count + 1,
         Title = request.Title,
         Description = request.Description,
         Priority = request.Priority,
@@ -82,14 +59,10 @@ app.MapPost("/api/tickets", (CreateTicketRequest request) =>
         CreatedAtUtc = DateTime.UtcNow
     };
 
-    tickets.Add(ticket);
+    db.Tickets.Add(ticket);
+    await db.SaveChangesAsync();
 
     return Results.Created($"/api/tickets/{ticket.Id}", ticket);
 });
 
 app.Run();
-
-record WeatherForecast(DateOnly Date, int TemperatureC, string? Summary)
-{
-    public int TemperatureF => 32 + (int)(TemperatureC / 0.5556);
-}
